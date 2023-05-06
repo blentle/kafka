@@ -353,6 +353,9 @@ object TestUtils extends Logging {
     if (!props.containsKey(KafkaConfig.GroupInitialRebalanceDelayMsProp))
       props.put(KafkaConfig.GroupInitialRebalanceDelayMsProp, "0")
     rack.foreach(props.put(KafkaConfig.RackProp, _))
+    // Reduce number of threads per broker
+    props.put(KafkaConfig.NumNetworkThreadsProp, "2")
+    props.put(KafkaConfig.BackgroundThreadsProp, "2")
 
     if (protocolAndPorts.exists { case (protocol, _) => usesSslTransportLayer(protocol) })
       props ++= sslConfigs(Mode.SERVER, false, trustStoreFile, s"server$nodeId")
@@ -1513,8 +1516,8 @@ object TestUtils extends Logging {
     waitUntilTrue(() =>
       brokers.forall(broker => topicPartitions.forall(tp => broker.replicaManager.onlinePartition(tp).isEmpty)),
       "Replica manager's should have deleted all of this topic's partitions")
-    // ensure that logs from all replicas are deleted if delete topic is marked successful in ZooKeeper
-    assertTrue(brokers.forall(broker => topicPartitions.forall(tp => broker.logManager.getLog(tp).isEmpty)),
+    // ensure that logs from all replicas are deleted
+    waitUntilTrue(() => brokers.forall(broker => topicPartitions.forall(tp => broker.logManager.getLog(tp).isEmpty)),
       "Replica logs not deleted after delete topic is complete")
     // ensure that topic is removed from all cleaner offsets
     waitUntilTrue(() => brokers.forall(broker => topicPartitions.forall { tp =>
